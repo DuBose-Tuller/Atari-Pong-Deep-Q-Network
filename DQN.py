@@ -9,6 +9,7 @@ import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from tqdm import tqdm
 
 def plot_learning_curve(x, scores, epsilons, filename, lines=None):
     fig=plt.figure()
@@ -321,8 +322,8 @@ class DQNAgent(object):
 ###################
 env = make_env('ALE/Pong-v5')
 best_score = -np.inf
-load_checkpoint = False
-n_games = 2
+load_checkpoint = True
+n_games = 10
 
 agent = DQNAgent(gamma=0.99, epsilon=1, lr=0.0001,
                  input_dims=(env.observation_space.shape),
@@ -340,7 +341,7 @@ figure_file = 'plots/' + fname + '.png'
 n_steps = 0
 scores, eps_history, steps_array = [], [], []
 
-for i in range(n_games):
+for i in tqdm(range(n_games)):
   observation, info = env.reset()
 
   score = 0
