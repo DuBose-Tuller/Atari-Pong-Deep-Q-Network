@@ -1,0 +1,8 @@
+opencv-python
+numpy
+gymnasium
+ale-py
+autorom[accept-rom-license]
+ipykernel
+matplotlib
+torch
