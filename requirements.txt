@@ -6,3 +6,4 @@ autorom[accept-rom-license]
 ipykernel
 matplotlib
 torch
+tqdm
