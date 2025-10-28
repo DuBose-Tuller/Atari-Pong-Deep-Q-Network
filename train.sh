@@ -5,5 +5,6 @@
 #SBATCH --nodes=1
 #SBATCH --mem=5GB
 
+module load apps/python/3.11.8
 source /home/tullwd25/691/Atari-Pong-Deep-Q-Network/.venv/bin/activate
 python DQN.py
