@@ -190,7 +190,12 @@ class DeepQNetwork(nn.Module):
         self.optimizer = optim.RMSprop(self.parameters(), lr=lr)
 
         self.loss = nn.MSELoss()
-        self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
+        if T.cuda.is_available():
+            self.device = T.device('cuda:0')
+        elif T.mps.is_available():
+            self.device = T.device('mps')
+        else:
+            self.device = 'cpu'
         self.to(self.device)
 
     def calculate_conv_output_dims(self, input_dims):
@@ -317,61 +322,107 @@ class DQNAgent(object):
         self.decrement_epsilon()
 
 
-###################
-# Notebook Code
-###################
-env = make_env('ALE/Pong-v5')
-best_score = -np.inf
-load_checkpoint = True
-n_games = 10
+class DDQNAgent(object):
+    def __init__(self, gamma, epsilon, lr, n_actions, input_dims,
+                 mem_size, batch_size, eps_min=0.01, eps_dec=5e-7,
+                 replace=1000, algo=None, env_name=None, chkpt_dir='tmp/dqn'):
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.lr = lr
+        self.n_actions = n_actions
+        self.input_dims = input_dims
+        self.batch_size = batch_size
+        self.eps_min = eps_min
+        self.eps_dec = eps_dec
+        self.replace_target_cnt = replace
+        self.algo = algo
+        self.env_name = env_name
+        self.chkpt_dir = chkpt_dir
+        self.action_space = [i for i in range(n_actions)]
+        self.learn_step_counter = 0
 
-agent = DQNAgent(gamma=0.99, epsilon=1, lr=0.0001,
-                 input_dims=(env.observation_space.shape),
-                 n_actions=env.action_space.n, mem_size=20000, eps_min=0.1,
-                 batch_size=32, replace=1000, eps_dec=1e-5,
-                 chkpt_dir='models/', algo='DQNAgent',
-                 env_name='Pong')
+        self.memory = ReplayBuffer(mem_size, input_dims, n_actions)
 
-if load_checkpoint:
-  agent.load_models()
+        self.q_eval = DeepQNetwork(self.lr, self.n_actions,
+                                    input_dims=self.input_dims,
+                                    name=self.env_name+'_'+self.algo+'_q_eval',
+                                    chkpt_dir=self.chkpt_dir)
 
-fname = agent.algo + '_' + agent.env_name + '_lr' + str(agent.lr) +'_' \
-            + str(n_games) + 'games'
-figure_file = 'plots/' + fname + '.png'
-n_steps = 0
-scores, eps_history, steps_array = [], [], []
+        self.q_next = DeepQNetwork(self.lr, self.n_actions,
+                                    input_dims=self.input_dims,
+                                    name=self.env_name+'_'+self.algo+'_q_next',
+                                    chkpt_dir=self.chkpt_dir)
 
-for i in tqdm(range(n_games)):
-  observation, info = env.reset()
+    def choose_action(self, observation):
+        if np.random.random() > self.epsilon:
+            state = T.tensor([observation],dtype=T.float).to(self.q_eval.device)
+            actions = self.q_eval.forward(state)
+            action = T.argmax(actions).item()
+        else:
+            action = np.random.choice(self.action_space)
 
-  score = 0
-  done = False
-  while not done:
-    action = agent.choose_action(observation)
-    observation_, reward, terminated, truncated, info = env.step(action)
-    done = terminated or truncated
-    score += reward
+        return action
 
-    if not load_checkpoint:
-      agent.store_transition(observation, action,
-                                     reward, observation_, done)
-      agent.learn()
-    observation = observation_
-    n_steps += 1
-  scores.append(score)
-  steps_array.append(n_steps)
+    def store_transition(self, state, action, reward, state_, done):
+        self.memory.store_transition(state, action, reward, state_, done)
 
-  avg_score = np.mean(scores[-100:])
-  print('episode: ', i,'score: ', score,
-             ' average score %.1f' % avg_score, 'best score %.2f' % best_score,
-            'epsilon %.2f' % agent.epsilon, 'steps', n_steps)
+    def sample_memory(self):
+        state, action, reward, new_state, done = \
+                                self.memory.sample_buffer(self.batch_size)
 
-  if avg_score > best_score:
-    if not load_checkpoint:
-      agent.save_models()
-    best_score = avg_score
+        states = T.tensor(state).to(self.q_eval.device)
+        rewards = T.tensor(reward).to(self.q_eval.device)
+        dones = T.tensor(done).to(self.q_eval.device)
+        actions = T.tensor(action).to(self.q_eval.device)
+        states_ = T.tensor(new_state).to(self.q_eval.device)
 
-  eps_history.append(agent.epsilon)
+        return states, actions, rewards, states_, dones
 
-x = [i+1 for i in range(len(scores))]
-plot_learning_curve(steps_array, scores, eps_history, figure_file)
+    def replace_target_network(self):
+        if self.learn_step_counter % self.replace_target_cnt == 0:
+            self.q_next.load_state_dict(self.q_eval.state_dict())
+
+    def decrement_epsilon(self):
+        self.epsilon = self.epsilon - self.eps_dec \
+                           if self.epsilon > self.eps_min else self.eps_min
+
+    def save_models(self):
+        self.q_eval.save_checkpoint()
+        self.q_next.save_checkpoint()
+
+    def load_models(self):
+        self.q_eval.load_checkpoint()
+        self.q_next.load_checkpoint()
+
+    def learn(self):
+        if self.memory.mem_cntr < self.batch_size:
+            return
+
+        self.q_eval.optimizer.zero_grad()
+
+        self.replace_target_network()
+
+        states, actions, rewards, states_, dones = self.sample_memory()
+        indices = np.arange(self.batch_size)
+
+        q_pred = self.q_eval.forward(states)[indices, actions]
+
+
+        # q_next = self.q_next.forward(states_).max(dim=1)[0]
+
+        # [1] return args, [0] does values
+        best_action = self.q_next.forward(states_).max(dim=1)[1]
+
+        # Select Q values from current state and best_action
+        q_next = self.q_eval.forward(states)[indices, best_action]
+
+        q_next[dones] = 0.0
+        q_target = rewards + self.gamma*q_next
+
+        # Update q_eval
+        loss = self.q_eval.loss(q_target, q_pred).to(self.q_eval.device)
+        loss.backward()
+        self.q_eval.optimizer.step()
+        self.learn_step_counter += 1
+
+        self.decrement_epsilon()

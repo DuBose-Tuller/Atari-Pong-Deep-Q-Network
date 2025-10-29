@@ -2,3 +2,5 @@
 models/
 plots/
 **/*.out
+.vscode/
+__pycache__/
