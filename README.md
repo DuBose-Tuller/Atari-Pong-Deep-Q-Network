@@ -1,1 +1,1 @@
-# Atari-Pong-Deep-Q-Network
+I changed the number of episodes aggregated per data points in the plot to 25 because the total number of training episodes was 1000, which roughly corresponded to the number of total training steps from the DQN paper (~ 1 million) 
