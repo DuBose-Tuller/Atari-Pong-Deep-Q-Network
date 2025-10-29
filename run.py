@@ -56,13 +56,15 @@ def make_env(env_name, shape=(84,84,1), repeat=4, clip_rewards=False,
 env = make_env('ALE/Pong-v5')
 best_score = -np.inf
 load_checkpoint = False
-n_games = 10
+algo='DDQNAgent'
+chkpt_dir='models/'
+n_games = 1000
 
-agent = DDQNAgent(gamma=0.99, epsilon=1, lr=0.0001,
+agent = globals()[algo](gamma=0.99, epsilon=1, lr=0.0001,
                  input_dims=(env.observation_space.shape),
                  n_actions=env.action_space.n, mem_size=20000, eps_min=0.1,
                  batch_size=32, replace=1000, eps_dec=1e-5,
-                 chkpt_dir='models/', algo='DDQNAgent',
+                 chkpt_dir=chkpt_dir, algo=algo,
                  env_name='Pong')
 
 if load_checkpoint:
@@ -105,6 +107,10 @@ for i in tqdm(range(n_games)):
     best_score = avg_score
 
   eps_history.append(agent.epsilon)
+
+np.save(os.path.join(chkpt_dir, f"scores-{algo}"), scores)
+np.save(os.path.join(chkpt_dir, f"eps_hist-{algo}"), eps_history)
+np.save(os.path.join(chkpt_dir, f"steps_arr-{algo}"), steps_array)
 
 x = [i+1 for i in range(len(scores))]
 plot_learning_curve(steps_array, scores, eps_history, figure_file)
