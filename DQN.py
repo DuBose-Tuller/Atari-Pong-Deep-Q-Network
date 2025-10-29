@@ -11,34 +11,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 
-def plot_learning_curve(x, scores, epsilons, filename, lines=None):
-    fig=plt.figure()
-    ax=fig.add_subplot(111, label="1")
-    ax2=fig.add_subplot(111, label="2", frame_on=False)
-
-    ax.plot(x, epsilons, color="C0")
-    ax.set_xlabel("Training Steps", color="C0")
-    ax.set_ylabel("Epsilon", color="C0")
-    ax.tick_params(axis='x', colors="C0")
-    ax.tick_params(axis='y', colors="C0")
-
-    N = len(scores)
-    running_avg = np.empty(N)
-    for t in range(N):
-	    running_avg[t] = np.mean(scores[max(0, t-20):(t+1)])
-
-    ax2.scatter(x, running_avg, color="C1")
-    ax2.axes.get_xaxis().set_visible(False)
-    ax2.yaxis.tick_right()
-    ax2.set_ylabel('Score', color="C1")
-    ax2.yaxis.set_label_position('right')
-    ax2.tick_params(axis='y', colors="C1")
-
-    if lines is not None:
-        for line in lines:
-            plt.axvline(x=line)
-
-    plt.savefig(filename)
 
 class RepeatActionAndMaxFrame(gym.Wrapper):
     def __init__(self, env=None, repeat=4, clip_reward=False, no_ops=0,
@@ -322,14 +294,15 @@ class DQNAgent(object):
 ###################
 env = make_env('ALE/Pong-v5')
 best_score = -np.inf
-load_checkpoint = True
+load_checkpoint = False
+chkpt_dir='models/'
 n_games = 10
 
 agent = DQNAgent(gamma=0.99, epsilon=1, lr=0.0001,
                  input_dims=(env.observation_space.shape),
                  n_actions=env.action_space.n, mem_size=20000, eps_min=0.1,
                  batch_size=32, replace=1000, eps_dec=1e-5,
-                 chkpt_dir='models/', algo='DQNAgent',
+                 chkpt_dir=chkpt_dir, algo='DQNAgent',
                  env_name='Pong')
 
 if load_checkpoint:
@@ -372,6 +345,11 @@ for i in tqdm(range(n_games)):
     best_score = avg_score
 
   eps_history.append(agent.epsilon)
+
+
+np.save(os.path.join(chkpt_dir, "scores"), scores)
+np.save(os.path.join(chkpt_dir, "eps_hist"), eps_history)
+np.save(os.path.join(chkpt_dir, "steps_arr"), steps_array)
 
 x = [i+1 for i in range(len(scores))]
 plot_learning_curve(steps_array, scores, eps_history, figure_file)
