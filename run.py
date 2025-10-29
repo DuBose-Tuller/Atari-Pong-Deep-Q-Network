@@ -12,35 +12,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 
-def plot_learning_curve(x, scores, epsilons, filename, lines=None):
-    fig=plt.figure()
-    ax=fig.add_subplot(111, label="1")
-    ax2=fig.add_subplot(111, label="2", frame_on=False)
-
-    ax.plot(x, epsilons, color="C0")
-    ax.set_xlabel("Training Steps", color="C0")
-    ax.set_ylabel("Epsilon", color="C0")
-    ax.tick_params(axis='x', colors="C0")
-    ax.tick_params(axis='y', colors="C0")
-
-    N = len(scores)
-    running_avg = np.empty(N)
-    for t in range(N):
-	    running_avg[t] = np.mean(scores[max(0, t-20):(t+1)])
-
-    ax2.scatter(x, running_avg, color="C1")
-    ax2.axes.get_xaxis().set_visible(False)
-    ax2.yaxis.tick_right()
-    ax2.set_ylabel('Score', color="C1")
-    ax2.yaxis.set_label_position('right')
-    ax2.tick_params(axis='y', colors="C1")
-
-    if lines is not None:
-        for line in lines:
-            plt.axvline(x=line)
-
-    plt.savefig(filename)
-
 def make_env(env_name, shape=(84,84,1), repeat=4, clip_rewards=False,
              no_ops=0, fire_first=False):
     env = gym.make(env_name)
@@ -55,7 +26,6 @@ def make_env(env_name, shape=(84,84,1), repeat=4, clip_rewards=False,
 ###################
 env = make_env('ALE/Pong-v5')
 best_score = -np.inf
-load_checkpoint = False
 algo='DDQNAgent'
 chkpt_dir='models/'
 n_games = 1000
@@ -67,8 +37,6 @@ agent = globals()[algo](gamma=0.99, epsilon=1, lr=0.0001,
                  chkpt_dir=chkpt_dir, algo=algo,
                  env_name='Pong')
 
-if load_checkpoint:
-  agent.load_models()
 
 fname = agent.algo + '_' + agent.env_name + '_lr' + str(agent.lr) +'_' \
             + str(n_games) + 'games'
@@ -87,10 +55,8 @@ for i in tqdm(range(n_games)):
     done = terminated or truncated
     score += reward
 
-    if not load_checkpoint:
-      agent.store_transition(observation, action,
-                                     reward, observation_, done)
-      agent.learn()
+    agent.store_transition(observation, action, reward, observation_, done)
+    agent.learn()
     observation = observation_
     n_steps += 1
   scores.append(score)
@@ -102,8 +68,7 @@ for i in tqdm(range(n_games)):
             'epsilon %.2f' % agent.epsilon, 'steps', n_steps)
 
   if avg_score > best_score:
-    if not load_checkpoint:
-      agent.save_models()
+    agent.save_models()
     best_score = avg_score
 
   eps_history.append(agent.epsilon)
@@ -113,4 +78,3 @@ np.save(os.path.join(chkpt_dir, f"eps_hist-{algo}"), eps_history)
 np.save(os.path.join(chkpt_dir, f"steps_arr-{algo}"), steps_array)
 
 x = [i+1 for i in range(len(scores))]
-plot_learning_curve(steps_array, scores, eps_history, figure_file)

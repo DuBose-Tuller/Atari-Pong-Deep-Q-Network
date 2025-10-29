@@ -1,12 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
-eps = np.load("models/eps_hist.npy")
-scores = np.load("models/scores.npy")
-
-plt.scatter(range(len(scores)), eps)
-plt.scatter(range(len(scores)), scores)
-
+import os
 
 def plot_learning_curve(x, scores, epsilons, filename, lines=None):
     fig=plt.figure()
@@ -36,3 +30,8 @@ def plot_learning_curve(x, scores, epsilons, filename, lines=None):
             plt.axvline(x=line)
 
     plt.savefig(filename)
+    
+agent = 'DDQNAgent'
+eps = np.load(os.path.join("models/", f"eps_hist-{agent}.npy"))
+scores = np.load(os.path.join("models/", f"scores-{agent}.npy"))
+plot_learning_curve(range(len(eps)), scores, eps, f"plots/{agent}-{len(eps)}")
