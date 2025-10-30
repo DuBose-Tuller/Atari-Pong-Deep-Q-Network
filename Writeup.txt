@@ -1,0 +1,8 @@
+Plots for both experiments are located in the plots/ folder.
+
+Observations between DQN and Double DQN (DDQN):
+
+The theory from the paper says that the DDQN algorithm should reduce the agent's overall Q-value estimations aggregated over all of the state/action pairs, which would lead to a higher-quality estimation of the environment's Q values. However, this new method causes the agent to fail the learning task altogether, though for now at least this is likely due to an implementation error. The original codebase from the tutorial was not designed with extensibility to Double DQN in mind, so my modification was to get the best actions for each simulation in the next timestep (S') in the batch using the target Q network, then paired those actions with each of the current timestep states (S) into the online Q network.
+As a test, I also tried reversing the roles of the two networks in this DDQN modification, but neither of them resulted in model improvement from random guessing.
+
+I uses Claude Code to help convert the original notebook into the new Gymnasium API, which ended up being more tricky to do than I expected because I also needed to migrate the code to numpy 2.0. The full chat I had can be found in the chats/ folder.

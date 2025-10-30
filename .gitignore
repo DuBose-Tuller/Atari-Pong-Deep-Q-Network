@@ -1,6 +1,5 @@
 .venv/
 models/
-plots/
 **/*.out
 gpu_models/
 .vscode/

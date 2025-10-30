@@ -379,14 +379,11 @@ class DDQNAgent(object):
 
         q_pred = self.q_eval.forward(states)[indices, actions]
 
-
-        # q_next = self.q_next.forward(states_).max(dim=1)[0]
-
         # [1] return args, [0] does values
-        best_action = self.q_next.forward(states_).max(dim=1)[1]
+        best_action = self.q_eval.forward(states_).max(dim=1)[1]
 
         # Select Q values from current state and best_action
-        q_next = self.q_eval.forward(states)[indices, best_action]
+        q_next = self.q_next.forward(states)[indices, best_action]
 
         q_next[dones] = 0.0
         q_target = rewards + self.gamma*q_next

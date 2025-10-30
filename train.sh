@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name "DQN Pong"
-#SBATCH --output "log.out"
+#SBATCH --output "log_DQN.out"
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gpus=1
